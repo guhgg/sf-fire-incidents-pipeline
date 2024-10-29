@@ -1,0 +1,4 @@
+echo "venv/" >> .gitignore
+echo ".env" >> .gitignore
+echo "postgres_data/" >> .gitignore
+echo "*.log" >> .gitignore

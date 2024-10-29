@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:13-3.1
+    platform: linux/amd64
+    container_name: fire_incidents_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fire_incidents_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fire_incidents_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: redis_broker
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  airflow-db:
+    image: postgres:13
+    container_name: airflow_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5433:5432"
+    volumes:
+      - airflow_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: airflow_webserver
+    restart: always
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__RBAC: "False"
+      AIRFLOW__WEBSERVER__AUTHENTICATE: "False"
+      AIRFLOW__CORE__BASE_LOG_FOLDER: /opt/airflow/logs
+      AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+      AIRFLOW_CONN_POSTGRES_WAREHOUSE: postgresql+psycopg2://postgres:postgres@db:5432/fire_incidents_db
+      AIRFLOW__CORE__FERNET_KEY: RkM5QkhRczgyR2tWNGtxREtZTkpYUkZRdTZjRE5tbEM=
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./scripts:/opt/airflow/scripts
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      airflow-db:
+        condition: service_healthy
+      airflow-scheduler:
+        condition: service_healthy
+    command: >
+      bash -c "
+      airflow db init &&
+      airflow webserver"
+
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: airflow_scheduler
+    restart: always
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      AIRFLOW_CONN_POSTGRES_WAREHOUSE: postgresql+psycopg2://postgres:postgres@db:5432/fire_incidents_db
+      AIRFLOW__CORE__BASE_LOG_FOLDER: /opt/airflow/logs
+      AIRFLOW__CORE__FERNET_KEY: RkM5QkhRczgyR2tWNGtxREtZTkpYUkZRdTZjRE5tbEM=
+    volumes:
+      - ./scripts:/opt/airflow/scripts
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      airflow-db:
+        condition: service_healthy
+    command: >
+      bash -c "
+      airflow db init &&
+      airflow scheduler"
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname $(hostname)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_data: {}
+  airflow_db: {}
