@@ -77,6 +77,11 @@ docker-compose up -d
     -   **Airflow Web UI:** http://localhost:8080  
     -   **PgAdmin:** http://localhost:5050  
         (Login: `admin@admin.com` / `admin`)
+        Host: db
+        Port: 5432
+        Username: postgres
+        Password: postgres
+        Database: fire_incidents_db
     -   **PostgreSQL:** `localhost:5432` (Database: `fire_incidents_db`)
 4.  **Trigger the DAG:** In the Airflow UI, navigate to **DAGs**, find the `sf_fire_incidents_star_schema_etl` DAG, and trigger it manually to start the ETL process.
 
