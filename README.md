@@ -30,8 +30,6 @@ This project provides an **ETL pipeline** to extract, transform, and load fire i
 
 -  **PostGIS** database for the warehouse.
 
--  **Redis** as a Celery broker (if needed for future expansion).
-
 -  **PgAdmin:** For managing and inspecting the database.
 
 3.  **PostgreSQL Star Schema:**
@@ -73,7 +71,8 @@ cd sf-fire-incidents-pipeline
 ```bash
 docker-compose up -d
 ```
-3.  **Access the following services:**
+3.  **Wait for the airflow and database initialization:**
+4.  **Access the following services:**
     
     -   **Airflow Web UI:** http://localhost:8080  
     -   **PgAdmin:** http://localhost:5050  
